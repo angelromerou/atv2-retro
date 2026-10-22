@@ -2,9 +2,11 @@
 
 Turns a jailbroken Apple TV 2 into a retro game console.
 
-Target: a jailbroken Apple TV 2 (iOS 6.1.4 / ATV 5.3, Seas0nPass), reached at `root@192.168.0.101` with password `alpine`. **Apple TV 2 only.** The Apple TV 3 has no easy jailbreak, and the Bluetooth daemon and menu tweak are written for the ATV2's chip and software.
+Target: a jailbroken Apple TV 2 (iOS 6.1.4 / ATV 5.3, Seas0nPass), reached over SSH as `root`. **Apple TV 2 only.** The Apple TV 3 has no easy jailbreak, and the Bluetooth daemon and menu tweak are written for the ATV2's chip and software.
 
-**Change that password first.** Every jailbroken Apple TV ships with `alpine`, so anyone on your network can log in as root. Run `ssh root@<apple tv>`, then `passwd`. The scripts in `tools/` read the address and password from `ATV_HOST` and `ATV_PASS` (e.g. `export ATV_HOST=192.168.1.50 ATV_PASS=yournewpassword`).
+In this README, `<atv-ip>` means your Apple TV's address. Find it on the TV under **Settings → General → Network** (e.g. `192.168.1.50`). Giving the Apple TV a fixed address in your router's DHCP settings keeps the links below from changing.
+
+**Change that password first.** Every jailbroken Apple TV ships with `alpine`, so anyone on your network can log in as root. Run `ssh root@<atv-ip>`, then `passwd`. The scripts in `tools/` read the address and password from `ATV_HOST` and `ATV_PASS` (e.g. `export ATV_HOST=192.168.1.50 ATV_PASS=yournewpassword`). Without them they use `192.168.0.101` and `alpine`.
 
 ## What's on it
 
@@ -15,7 +17,7 @@ Target: a jailbroken Apple TV 2 (iOS 6.1.4 / ATV 5.3, Seas0nPass), reached at `r
 
 **Controls**
 - The Apple remote, Bluetooth controllers (up to 4 players), and the PC keyboard via `python tools/atvkeys.py`. The DualSense is tested. The DualShock 4 and other classic-Bluetooth pads should work but are **untested**.
-- For testing without being in front of the TV: **http://192.168.0.101/remote** shows a screenshot of the TV with remote buttons (d-pad, OK, Menu, Play/Pause, Close app) and also takes arrow keys/Enter/Esc. It works in apps and on the home screen. It's for the home network only, since it has no password.
+- For testing without being in front of the TV: **http://<atv-ip>/remote** shows a screenshot of the TV with remote buttons (d-pad, OK, Menu, Play/Pause, Close app) and also takes arrow keys/Enter/Esc. It works in apps and on the home screen. It's for the home network only, since it has no password.
 - PS steps back one level: game → that console's game list → home screen. Apps that don't handle PS themselves (Doom) close straight to the home screen.
 - Holding Menu on the remote for 1.5 s always closes the current app.
 - The screensaver's default photos are replaced with the console logos (made by `tools/make-menu.py`, installed by `tools/install-system.sh`).
@@ -23,7 +25,7 @@ Target: a jailbroken Apple TV 2 (iOS 6.1.4 / ATV 5.3, Seas0nPass), reached at `r
 
 ## Adding games
 
-Open **http://192.168.0.101** in a browser on any phone or computer on the same network, then drop ROM files onto the page or tap **Choose files**. (Each console's game list on the TV shows this address in its top-right corner.)
+Open **http://<atv-ip>** in a browser on any phone or computer on the same network, then drop ROM files onto the page or tap **Choose files**. (Each console's game list on the TV shows this address in its top-right corner.)
 
 - The console is picked from the file type. For an ambiguous file, pick the console on the page first.
 - Zipped ROMs are unpacked for you.
@@ -70,7 +72,7 @@ wsl -d Ubuntu -- bash -c 'cd atvlaunch && ../toolchain/atv-cc -O2 -dynamiclib Tw
 
 tools/install-system.sh                          # tweak + atvopen + atvpadd + atvromsd
 tools/deploy.sh --no-launch apps/doom/Doom.app apps/controllers/Controllers.app apps/consoles/*.app
-tools/screenshot.sh shot.png                     # see the TV from the PC (or open http://192.168.0.101/remote)
+tools/screenshot.sh shot.png                     # see the TV from the PC (or open http://<atv-ip>/remote)
 ```
 
 Notes on `deploy.sh`:
@@ -96,7 +98,7 @@ Toolchain notes:
 
 ## Uninstall
 
-On the Apple TV (`ssh root@192.168.0.101`):
+On the Apple TV (`ssh root@<atv-ip>`):
 
 ```bash
 launchctl unload /Library/LaunchDaemons/com.atvdev.atvpadd.plist

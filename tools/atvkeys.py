@@ -2,14 +2,15 @@
 
 Opens a small window; while it has focus, key presses/releases are sent to the app running
 on the Apple TV as HID keyboard-page (0x07) UDP packets (see sdk/atvremote.h).
-Usage: python tools/atvkeys.py [host]    (default 192.168.0.101)
+Usage: python tools/atvkeys.py [host]    (default $ATV_HOST, else 192.168.0.101)
 """
+import os
 import socket
 import struct
 import sys
 import tkinter as tk
 
-HOST = sys.argv[1] if len(sys.argv) > 1 else "192.168.0.101"
+HOST = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("ATV_HOST", "192.168.0.101")
 PORT = 37777
 
 USAGES = {
