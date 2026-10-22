@@ -18,7 +18,8 @@ plink -batch -ssh -pw "$PASS" root@$HOST '
   atvpadd selftest
   launchctl unload /Library/LaunchDaemons/com.atvdev.atvromsd.plist 2>/dev/null
   mv atvromsd /usr/bin/ && chmod 755 /usr/bin/atvromsd
-  atvromsd selftest
+  chown -R mobile:mobile /var/mobile/Media/ROMs 2>/dev/null  # older installs ran the selftest as root, leaving it root-owned
+  su mobile -c "atvromsd selftest"  # as root it would create the ROM folder that the mobile-run daemon must write to
   mkdir -p /usr/share/atvroms && mv index.html remote.html /usr/share/atvroms/
   mv com.atvdev.atvromsd.plist /Library/LaunchDaemons/ && chown root:wheel /Library/LaunchDaemons/com.atvdev.atvromsd.plist
   launchctl load /Library/LaunchDaemons/com.atvdev.atvromsd.plist
