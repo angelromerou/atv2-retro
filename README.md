@@ -1,6 +1,8 @@
-# Apple TV 2 retro console
+# atv2-retro
 
-Target: a jailbroken Apple TV 2 (iOS 6.1.4 / ATV 5.3, Seas0nPass), reached at `root@192.168.0.101` with password `alpine`.
+Turns a jailbroken Apple TV 2 into a retro game console.
+
+Target: a jailbroken Apple TV 2 (iOS 6.1.4 / ATV 5.3, Seas0nPass), reached at `root@192.168.0.101` with password `alpine`. **Apple TV 2 only.** The Apple TV 3 has no easy jailbreak, and the Bluetooth daemon and menu tweak are written for the ATV2's chip and software.
 
 **Change that password first.** Every jailbroken Apple TV ships with `alpine`, so anyone on your network can log in as root. Run `ssh root@<apple tv>`, then `passwd`. The scripts in `tools/` read the address and password from `ATV_HOST` and `ATV_PASS` (e.g. `export ATV_HOST=192.168.1.50 ATV_PASS=yournewpassword`).
 
