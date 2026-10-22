@@ -96,6 +96,7 @@ static struct retro_system_av_info av;
 static uint8_t *frame;  // staging, max_width * max_height * bytes per pixel
 static unsigned frameW, frameH;
 static bool frameDirty;
+static bool skipVideo;  // catch-up frame: the core may skip rendering (GET_AUDIO_VIDEO_ENABLE)
 
 static unsigned bytesPerPixel(void) { return pixelFormat == RETRO_PIXEL_FORMAT_XRGB8888 ? 4 : 2; }
 
@@ -265,6 +266,9 @@ static bool environment(unsigned cmd, void *data) {
         case RETRO_ENVIRONMENT_GET_LOG_INTERFACE: ((struct retro_log_callback *)data)->log = core_log; return true;
         case RETRO_ENVIRONMENT_GET_CAN_DUPE: *(bool *)data = true; return true;
         case RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE: *(bool *)data = false; return true;
+        case RETRO_ENVIRONMENT_GET_AUDIO_VIDEO_ENABLE:
+            if (data) *(int *)data = RETRO_AV_ENABLE_AUDIO | (skipVideo ? 0 : RETRO_AV_ENABLE_VIDEO);
+            return true;
         case RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS:
         case RETRO_ENVIRONMENT_SET_CONTROLLER_INFO:
         case RETRO_ENVIRONMENT_SET_PERFORMANCE_LEVEL: return true;
@@ -383,6 +387,8 @@ static GLuint compileShader(GLenum type, const char *src) {
     GLint bufW, bufH;
     CADisplayLink *link;
     unsigned saveCounter;
+    double lastStep, owed;  // core frames due, by the clock
+    double statStart, statRunMax, statRunSum; unsigned statFrames, statSkipped, statSteps;
 }
 
 + (Class)layerClass { return [CAEAGLLayer class]; }
@@ -450,12 +456,34 @@ static GLuint compileShader(GLenum type, const char *src) {
 }
 
 - (void)step {
-    core.run();
-    if (wantExitGame) {  // tear down after this frame callback has returned
-        wantExitGame = false;
-        void (^exitBlock)(void) = [[self.onExit copy] autorelease];
-        dispatch_async(dispatch_get_main_queue(), exitBlock);
-        return;
+    // Emulate by the clock, not one frame per refresh: a frame that misses a refresh would otherwise slow
+    // the game and starve the audio, and the TV's rate isn't the console's. Catch-up frames skip drawing.
+    double now = link.timestamp;
+    owed += lastStep ? (now - lastStep) * av.timing.fps : 1;
+    lastStep = now;
+    if (owed > 4) owed = 4;  // far behind (or stalled): drop the backlog instead of spiraling
+    double t0 = CACurrentMediaTime();
+    unsigned ran = 0;
+    for (; owed >= 1; owed--, ran++) {
+        skipVideo = owed >= 2;  // only the last frame of a batch is drawn
+        core.run();
+        if (wantExitGame) {  // tear down after this frame callback has returned
+            wantExitGame = false; skipVideo = false;
+            void (^exitBlock)(void) = [[self.onExit copy] autorelease];
+            dispatch_async(dispatch_get_main_queue(), exitBlock);
+            return;
+        }
+    }
+    skipVideo = false;
+    double t = CACurrentMediaTime() - t0;
+    statFrames += ran; statSkipped += ran > 1 ? ran - 1 : 0; statSteps++;
+    statRunSum += t; if (t > statRunMax) statRunMax = t;
+    if (!statStart) statStart = now;
+    if (now - statStart >= 10) {
+        LOG("speed: %.1f fps emulated (core %.2f), %.1f steps/s (refresh %.1f Hz), %u skipped, run avg %.1f ms max %.1f ms",
+            statFrames / (now - statStart), av.timing.fps, statSteps / (now - statStart), 1 / link.duration, statSkipped,
+            statRunSum * 1000 / statSteps, statRunMax * 1000);
+        statStart = now; statFrames = statSkipped = statSteps = 0; statRunSum = statRunMax = 0;
     }
     if (++saveCounter % 120 == 0) saveSramIfChanged();  // every ~2 s
     if (!bufW || !frameW) return;

@@ -1,6 +1,7 @@
 #!/bin/bash
 # clang wrapper targeting the Apple TV 2 (armv7, iOS 6.1). Usage: atv-cc [clang args...]
+# $ATV_CFLAGS goes last, so it wins over a makefile's own flags (tools/build-cores.sh uses it).
 T=$HOME/atv/toolchain/bin
 SDK=$HOME/atv/sdks/iPhoneOS6.1.sdk
 exec clang -target armv7-apple-ios6.0 -isysroot "$SDK" -fuse-ld="$T/arm-apple-darwin11-ld" \
-  -Wno-unused-command-line-argument -mlinker-version=956.6 "$@"
+  -Wno-unused-command-line-argument -mlinker-version=956.6 "$@" $ATV_CFLAGS
