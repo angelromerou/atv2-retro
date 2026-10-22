@@ -371,7 +371,9 @@ static void serve(int fd) {
         atvremote_close_active();
         replyJSON(fd, "200 OK", "{}");
     } else if (!strcmp(method, "GET") && !strcmp(target, "/api/screenshot")) {
-        if (atvremote_screenshot()) reply(fd, "503 Service Unavailable", "text/plain", "no screenshot", 13);
+        // libnotify won't post from a fork child that hasn't exec'd, so atvopen asks the tweak for us
+        signal(SIGCHLD, SIG_DFL);  // inherited SIG_IGN would make system() lose atvopen's exit status
+        if (system("/usr/bin/atvopen --screenshot >/dev/null")) reply(fd, "503 Service Unavailable", "text/plain", "no screenshot", 13);
         else replyFile(fd, ATVSHOT_FILE, "image/png");
     } else if (!strcmp(method, "GET") && !strcmp(target, "/api/consoles")) {
         listConsoles(fd);
