@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleExecutable</key>
+	<string>Retro</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.atvdev.snes</string>
+	<key>CFBundleName</key>
+	<string>SNES</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleVersion</key>
+	<string>1.0</string>
+	<key>RetroColor</key>
+	<string>#6946be</string>
+	<key>RetroCore</key>
+	<string>snes9x2010</string>
+	<key>RetroExtensions</key>
+	<array>
+		<string>sfc</string>
+		<string>smc</string>
+	</array>
+	<key>RetroSystem</key>
+	<string>snes</string>
+	<key>RetroTitle</key>
+	<string>Super Nintendo</string>
+	<key>UIInterfaceOrientation</key>
+	<string>UIInterfaceOrientationLandscapeRight</string>
+	<key>UIStatusBarHidden</key>
+	<true/>
+</dict>
+</plist>

@@ -1,0 +1,5 @@
+# Unix line endings everywhere: the scripts run in WSL and on the Apple TV
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.wad binary

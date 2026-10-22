@@ -1,0 +1,9 @@
+#!/bin/bash
+# clang++ wrapper targeting the Apple TV 2 (armv7, iOS 6.1). The SDK only ships libstdc++ 4.2.1 headers (C++98),
+# so any -stdlib= a makefile passes (libretro iOS makefiles ask for libc++) is replaced with libstdc++.
+T=$HOME/atv/toolchain/bin
+SDK=$HOME/atv/sdks/iPhoneOS6.1.sdk
+args=()
+for a in "$@"; do [[ $a == -stdlib=* ]] || args+=("$a"); done
+exec clang++ -target armv7-apple-ios6.0 -isysroot "$SDK" -fuse-ld="$T/arm-apple-darwin11-ld" -stdlib=libstdc++ \
+  -Wno-unused-command-line-argument -Wno-deprecated -mlinker-version=956.6 "${args[@]}"

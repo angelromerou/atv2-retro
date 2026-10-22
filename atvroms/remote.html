@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Apple TV Remote</title>
+<style>
+  :root { --bg: #111418; --card: #1c2027; --line: #2c323c; --text: #f2f4f7; --dim: #9aa3b2; --accent: #3b82f6; --bad: #ff5f57; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 720px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 26px; margin: 0 0 12px; display: flex; justify-content: space-between; align-items: baseline; }
+  h1 a { font-size: 15px; font-weight: 400; color: var(--dim); }
+  #screen { display: block; width: 100%; aspect-ratio: 16 / 9; background: #000; border: 1px solid var(--line); border-radius: 10px; object-fit: contain; cursor: pointer; }
+  #status { color: var(--dim); font-size: 14px; min-height: 1.45em; margin: 6px 0 16px; }
+  #status.bad { color: var(--bad); }
+  .pad { display: grid; grid-template-columns: repeat(3, 76px); grid-template-rows: repeat(3, 76px); gap: 8px; justify-content: center; }
+  button { background: var(--card); color: var(--text); border: 1px solid var(--line); border-radius: 14px; font: inherit; font-weight: 600; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; user-select: none; }
+  button:active { background: var(--accent); border-color: var(--accent); }
+  button:focus-visible { outline: 3px solid #93c5fd; outline-offset: 2px; }
+  .pad .select { border-radius: 50%; }
+  .row { display: flex; gap: 8px; justify-content: center; margin-top: 16px; }
+  .row button { padding: 14px 18px; min-width: 96px; }
+  .row .close { color: var(--bad); }
+  p { color: var(--dim); font-size: 14px; text-align: center; margin-top: 20px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Remote <a href="/">Add games</a></h1>
+  <img id="screen" alt="What's on the TV (tap to refresh)">
+  <div id="status" aria-live="polite"></div>
+
+  <div class="pad">
+    <span></span><button data-b="up" aria-label="Up">▲</button><span></span>
+    <button data-b="left" aria-label="Left">◀</button><button data-b="select" class="select">OK</button><button data-b="right" aria-label="Right">▶</button>
+    <span></span><button data-b="down" aria-label="Down">▼</button><span></span>
+  </div>
+  <div class="row">
+    <button data-b="menu">Menu</button>
+    <button data-b="play">Play/Pause</button>
+    <button id="close" class="close">Close app</button>
+  </div>
+  <p>Keyboard: arrows, Enter = OK, Esc/Backspace = Menu, Space = Play/Pause. Tap the picture to refresh it.</p>
+</main>
+<script>
+const screen = document.getElementById("screen"), status = document.getElementById("status");
+function say(msg, bad) { status.textContent = msg; status.className = bad ? "bad" : ""; }
+
+// one screenshot at a time; a request made while one is loading runs after it
+let loading = false, again = false, timer;
+function refresh() {
+  if (loading) { again = true; return; }
+  loading = true;
+  screen.src = "/api/screenshot?t=" + Date.now();
+}
+screen.onload = () => { loading = false; say("Updated " + new Date().toLocaleTimeString()); if (again) { again = false; refresh(); } };
+screen.onerror = () => { loading = false; again = false; say("Couldn't get a screenshot", true); };
+screen.onclick = refresh;
+function refreshSoon() { clearTimeout(timer); timer = setTimeout(refresh, 600); }  // let the TV finish its animation
+
+// presses go one after another so the TV gets them in order
+let chain = Promise.resolve();
+function post(url) {
+  chain = chain.then(() => fetch(url, { method: "POST", headers: { "X-ATV": "1" } }))
+    .then(r => { if (!r.ok) throw 0; refreshSoon(); })
+    .catch(() => say("The Apple TV didn't respond", true));
+}
+const press = b => post("/api/press?button=" + b);
+
+document.querySelectorAll("[data-b]").forEach(el => el.onclick = () => press(el.dataset.b));
+document.getElementById("close").onclick = () => post("/api/close");
+
+const KEYS = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right",
+               Enter: "select", Escape: "menu", Backspace: "menu", " ": "play" };
+document.addEventListener("keydown", e => {
+  const b = KEYS[e.key];
+  if (!b || e.altKey || e.ctrlKey || e.metaKey) return;
+  e.preventDefault();  // also stops Enter/Space from clicking the focused button a second time
+  press(b);
+});
+
+refresh();
+</script>
+</body>
+</html>

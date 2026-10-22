@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>ATVDEVLaunchID</key>
+	<string>com.atvdev.doom</string>
+	<key>FRApplianceCategoryDescriptors</key>
+	<array/>
+	<key>FRApplianceIdentifier</key>
+	<string>com.atvdev.appliance.doom</string>
+	<key>FRApplianceLocalizableNameKey</key>
+	<string>Doom</string>
+	<key>FRAppliancePreferedOrderValue</key>
+	<real>5.1</real>
+	<key>FRHideIfNoCategories</key>
+	<false/>
+	<key>FRLocalizableStringsFileName</key>
+	<string>ATVDevLocalizable</string>
+	<key>FRPrincipalClass</key>
+	<string>ATVDEVAppAppliance</string>
+	<key>FRRemoteAppliance</key>
+	<true/>
+</dict>
+</plist>

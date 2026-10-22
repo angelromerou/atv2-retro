@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Apple TV Games</title>
+<style>
+  :root { --bg: #111418; --card: #1c2027; --line: #2c323c; --text: #f2f4f7; --dim: #9aa3b2; --accent: #3b82f6; --ok: #34c759; --bad: #ff5f57; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 720px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 30px; margin: 0 0 4px; }
+  h1 { display: flex; justify-content: space-between; align-items: baseline; }
+  h1 a { font-size: 15px; font-weight: 400; color: var(--dim); }
+  h2 { font-size: 19px; margin: 36px 0 12px; }
+  p { color: var(--dim); margin: 0 0 20px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  .chips button { border: 1px solid var(--line); background: var(--card); color: var(--text); border-radius: 999px; padding: 8px 16px; font: inherit; cursor: pointer; }
+  .chips button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); }
+  #drop { border: 2px dashed var(--line); border-radius: 16px; padding: 40px 16px; text-align: center; background: var(--card); transition: border-color .15s, background .15s; }
+  #drop.over { border-color: var(--accent); background: #1f2836; }
+  #drop strong { display: block; font-size: 18px; margin-bottom: 6px; }
+  #drop span { color: var(--dim); }
+  #pick { margin-top: 18px; background: var(--accent); color: #fff; border: 0; border-radius: 10px; padding: 12px 22px; font: inherit; font-weight: 600; cursor: pointer; }
+  #pick:focus-visible, .chips button:focus-visible { outline: 3px solid #93c5fd; outline-offset: 2px; }
+  ul { list-style: none; margin: 0; padding: 0; }
+  #queue li { background: var(--card); border-radius: 10px; padding: 10px 14px; margin-top: 8px; }
+  #queue .row { display: flex; justify-content: space-between; gap: 12px; }
+  #queue .name { overflow-wrap: anywhere; }
+  #queue .status { color: var(--dim); white-space: nowrap; }
+  #queue .ok .status { color: var(--ok); }
+  #queue .bad .status { color: var(--bad); white-space: normal; text-align: right; }
+  progress { width: 100%; height: 4px; margin-top: 8px; accent-color: var(--accent); }
+  .console { background: var(--card); border-radius: 12px; padding: 14px 16px; margin-top: 10px; }
+  .console h3 { margin: 0; font-size: 16px; display: flex; justify-content: space-between; }
+  .console h3 span { color: var(--dim); font-weight: 400; }
+  .console li { color: var(--dim); padding: 4px 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-top: 1px solid var(--line); }
+  .console li:first-child { border-top: 0; }
+  .console li span { overflow-wrap: anywhere; }
+  .console li.new { color: var(--ok); }
+  .console li button { flex: none; background: none; border: 1px solid var(--line); color: var(--dim); border-radius: 8px; padding: 5px 12px; font: inherit; font-size: 14px; cursor: pointer; }
+  .console li button:hover { color: var(--bad); border-color: var(--bad); }
+  .console li button:focus-visible { outline: 3px solid #93c5fd; outline-offset: 2px; }
+  .console li button:disabled { opacity: .5; cursor: default; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Add games <a href="/remote">Remote</a></h1>
+  <p>Drop ROM files here and they appear on the Apple TV. Zipped ROMs are unpacked for you. Reopen a console on the TV to see your changes.</p>
+
+  <div class="chips" id="consoles" role="group" aria-label="Console"></div>
+
+  <div id="drop">
+    <strong>Drop games here</strong>
+    <span id="hint">The console is picked from the file type</span><br>
+    <button id="pick" type="button">Choose files</button>
+    <input id="files" type="file" multiple hidden>
+  </div>
+
+  <ul id="queue" aria-live="polite"></ul>
+
+  <h2>On your Apple TV</h2>
+  <div id="library"></div>
+</main>
+<script>
+var consoles = [], chosen = '', fresh = {}, queue = [], busy = false;
+var $ = function (id) { return document.getElementById(id); };
+
+function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+
+function load() {
+  fetch('/api/consoles').then(function (r) { return r.json(); }).then(function (list) {
+    consoles = list;
+    var chips = $('consoles'); chips.innerHTML = '';
+    [{ system: '', title: 'Any console' }].concat(list).forEach(function (c) {
+      var b = el('button', '', c.title); b.type = 'button';
+      b.setAttribute('aria-pressed', c.system === chosen);
+      b.onclick = function () { chosen = c.system; load(); };
+      chips.appendChild(b);
+    });
+    var c = list.filter(function (c) { return c.system === chosen; })[0];
+    $('hint').textContent = c ? 'Files go to ' + c.title + ' (' + c.exts.map(function (x) { return '.' + x; }).join(' ') + ' or .zip)'
+                              : 'The console is picked from the file type';
+    var lib = $('library'); lib.innerHTML = '';
+    list.forEach(function (c) {
+      var box = el('div', 'console'), h = el('h3', '', c.title), ul = el('ul');
+      h.appendChild(el('span', '', c.games.length + (c.games.length === 1 ? ' game' : ' games')));
+      box.appendChild(h);
+      c.games.forEach(function (g) {
+        var li = el('li', fresh[c.system + '/' + g] ? 'new' : ''), del = el('button', '', 'Delete');
+        del.type = 'button'; del.setAttribute('aria-label', 'Delete ' + g);
+        del.onclick = function () { remove(c, g, del); };
+        li.appendChild(el('span', '', g)); li.appendChild(del); ul.appendChild(li);
+      });
+      box.appendChild(ul); lib.appendChild(box);
+    });
+  }).catch(function () { $('library').textContent = 'Can\'t reach the Apple TV.'; });
+}
+
+function remove(c, game, button) {
+  if (!confirm('Delete "' + game + '" from ' + c.title + '?\n\nIts saved progress is kept, so adding it back later picks up where you left off.')) return;
+  button.disabled = true;
+  fetch('/api/delete?system=' + c.system + '&name=' + encodeURIComponent(game), { method: 'POST', headers: { 'X-ATV': '1' } })
+    .then(function (r) { return r.json(); })
+    .then(function (r) { if (r.error) alert(r.error); load(); })
+    .catch(function () { alert('Lost the connection to the Apple TV'); load(); });
+}
+
+function add(files) {
+  Array.prototype.forEach.call(files, function (f) {
+    var li = el('li'), row = el('div', 'row'), status = el('span', 'status', 'Waiting'), bar = el('progress');
+    bar.max = 1; bar.value = 0;
+    row.appendChild(el('span', 'name', f.name)); row.appendChild(status);
+    li.appendChild(row); li.appendChild(bar); $('queue').appendChild(li);
+    queue.push({ file: f, system: chosen, li: li, status: status, bar: bar });
+  });
+  next();
+}
+
+function next() {
+  if (busy || !queue.length) return;
+  busy = true;
+  var job = queue.shift(), x = new XMLHttpRequest();
+  x.open('POST', '/api/upload?name=' + encodeURIComponent(job.file.name) + (job.system ? '&system=' + job.system : ''));
+  x.setRequestHeader('X-ATV', '1');  // the Apple TV only takes POSTs from its own pages
+  x.upload.onprogress = function (e) { if (e.lengthComputable) { job.bar.value = e.loaded / e.total; job.status.textContent = Math.round(100 * e.loaded / e.total) + '%'; } };
+  x.onload = function () {
+    var r = {}; try { r = JSON.parse(x.responseText); } catch (e) {}
+    job.bar.remove();
+    if (r.saved) {
+      job.li.className = 'ok';
+      job.status.textContent = r.saved.length > 1 ? r.saved.length + ' games added to ' + r.title : 'Added to ' + r.title;
+      r.saved.forEach(function (g) { fresh[r.system + '/' + g] = true; });
+    } else {
+      job.li.className = 'bad';
+      job.status.textContent = r.error || 'Upload failed';
+    }
+    done();
+  };
+  x.onerror = function () { job.bar.remove(); job.li.className = 'bad'; job.status.textContent = 'Lost the connection to the Apple TV'; done(); };
+  job.status.textContent = '0%';
+  x.send(job.file);
+}
+
+function done() { busy = false; load(); next(); }
+
+$('pick').onclick = function () { $('files').click(); };
+$('files').onchange = function () { add(this.files); this.value = ''; };
+var drop = $('drop');
+['dragenter', 'dragover'].forEach(function (t) { document.addEventListener(t, function (e) { e.preventDefault(); drop.className = 'over'; }); });
+['dragleave', 'drop'].forEach(function (t) { document.addEventListener(t, function (e) { e.preventDefault(); if (t === 'drop' || !e.relatedTarget) drop.className = ''; }); });
+document.addEventListener('drop', function (e) { add(e.dataTransfer.files); });
+load();
+</script>
+</body>
+</html>

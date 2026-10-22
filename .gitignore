@@ -1,0 +1,20 @@
+# Apple's binaries, class dumps and Bluetooth traces from reverse engineering: not ours to share
+re/
+# ROMs: add your own
+downloads/roms/
+# same file as apps/doom/Doom.app/doom1.wad
+downloads/wad/
+
+# build output (rebuild with the commands in README.md)
+build/
+obj/
+apps/retro/build/
+atvlaunch/ATVLaunch.dylib
+atvlaunch/atvopen
+atvpad/atvpadd
+atvroms/atvromsd
+apps/consoles/*.app/Retro
+apps/consoles/*.app/core.dylib
+apps/controllers/Controllers.app/Controllers
+apps/doom/Doom.app/Doom
+apps/template/Hello.app/Hello
