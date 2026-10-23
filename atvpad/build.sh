@@ -1,5 +1,5 @@
 #!/bin/bash
-# Builds atvpadd (Bluetooth gamepad daemon) for the Apple TV 2. Run inside WSL: bash atvpad/build.sh
+# Builds atvpadd (Bluetooth gamepad daemon) for the Apple TV 2 and 3. Run inside WSL or Linux: bash atvpad/build.sh
 set -e
 cd "$(dirname "$0")"
 B=$HOME/atv/btstack

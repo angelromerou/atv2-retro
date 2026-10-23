@@ -64,7 +64,7 @@ Blackb0x's script (`/etc/setup.sh`) runs again at every boot and runs `apt-get u
 **Differences from the ATV2**
 - Arrange or hide any home-screen item, ours included, the stock way: hold Select until it jiggles, move it with the arrows, or press Play/Pause for **Hide This Item**. Hidden items come back under **Settings → Main Menu**.
 - Apple's screensaver photos stay.
-- Controllers: not yet. `atvpadd` isn't ported (the ATV3's Bluetooth chip is on a plain UART, `/dev/tty.bluetooth`), so `tools/install-system.sh` leaves Apple's Bluetooth running and skips it.
+- Controllers work as on the ATV2 (tested with a DualSense). Its BCM4334 chip has Bluetooth LE, but `atvpadd` is Classic only, so Xbox pads still don't work.
 - Screenshots (`atvopen --screenshot`, `/remote`) show the home screen, but come out black while an app is open.
 - iOS 8 kills unsigned binaries: `tools/deploy.sh` and `tools/install-system.sh` sign everything with `ldid -S` on the Apple TV.
 - Apps need `UIDeviceFamily` with 3 (Apple TV) in their Info.plist, or the home screen refuses to launch them ("App looks unsafe for use on the internet"). The apps here have it, and `tools/make-menu.py` adds it.

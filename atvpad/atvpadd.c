@@ -1,4 +1,4 @@
-// atvpadd: Bluetooth gamepad daemon for the Apple TV 2.
+// atvpadd: Bluetooth gamepad daemon for the Apple TV 2 and 3.
 // Takes the Bluetooth chip over from Apple's BTServer, runs BTstack as a Classic HID host,
 // pairs/accepts gamepads (DualShock 4, DualSense, most classic-BT pads) and forwards their
 // buttons to the running atvdev app as UDP packets (sdk/atvremote.h). PS/Home quits the app.
@@ -387,12 +387,13 @@ static void bt_power_on(void) {
     system("launchctl unload /System/Library/LaunchDaemons/com.apple.BTServer.plist 2>/dev/null");
     system("launchctl unload /System/Library/LaunchDaemons/com.apple.BlueTool.plist 2>/dev/null");
     system("killall -9 BTServer BlueTool 2>/dev/null");
+    // holding /dev/btwake open keeps the chip from sleeping (it's mains powered, so no cost);
+    // on the ATV3 it must be held before BlueTool runs, or BlueTool hangs talking to a sleeping chip
+    if (open("/dev/btwake", O_RDWR) < 0) perror("btwake");
     system("/usr/sbin/BlueTool -F boot >/dev/null 2>&1");
     char cmd[160];
     snprintf(cmd, sizeof cmd, "printf 'device -D -S\\nwake on\\nbcm -b %d\\nmsleep 200\\nwake off\\nquit\\n' | /usr/sbin/BlueTool >/dev/null 2>&1", UART_BAUD);
     system(cmd);
-    // holding /dev/btwake open keeps the chip from sleeping (it's mains powered, so no cost)
-    if (open("/dev/btwake", O_RDWR) < 0) perror("btwake");
 }
 
 static void selftest(void) {
