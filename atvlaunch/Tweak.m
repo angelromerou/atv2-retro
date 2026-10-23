@@ -16,6 +16,7 @@
 #include <notify.h>
 #include <dlfcn.h>
 #include <arpa/inet.h>
+#include <mach/mach_time.h>
 #include "../sdk/atvremote.h"
 
 #define MENU_HOLD_KILL 1.5  // seconds
@@ -31,6 +32,7 @@ enum { kIOHIDEventTypeKeyboard = 3, kKbdPage = 3 << 16, kKbdUsage = (3 << 16) | 
 @end
 @interface NSObject (BR)
 + (id)defaultWorkspace;
++ (id)eventWithAction:(int)action value:(int)value atTime:(double)time originator:(unsigned)originator;
 - (BOOL)openApplicationWithBundleID:(NSString *)ident;
 - (NSString *)principalClassName;
 + (id)eventWithPage:(unsigned short)page usage:(unsigned short)usage value:(int)value;
@@ -238,6 +240,7 @@ static void saveScreenshot(void) {
 }
 
 static IMP origProcess;
+static SEL processSel;  // processHIDEvent: (iOS 6) or _processHIDEvent: (iOS 8)
 static int sock = -1;
 static CFAbsoluteTime menuDownAt;
 
@@ -263,6 +266,28 @@ static void hookedProcess(id self, SEL _cmd, IOHIDEventRef e) {
     ((void (*)(id, SEL, IOHIDEventRef))origProcess)(self, _cmd, e);
 }
 
+// iOS 8: post the BREvent the real remote produces (logged from ATVHIDSystemClient), so plugins with their
+// own key handling (Kodi) see a normal remote. Its arrows send down and up, everything else only down.
+// BRHIDEvent's page/usage mapping gave Kodi other actions and endless presses.
+static void postRemoteAction(uint32_t page, uint32_t usage, uint32_t down) {
+    enum { MENU = 1, TOP_MENU = 2, UP, DOWN, PLAY_PAUSE_SELECT, LEFT, RIGHT, PLAY_PAUSE = 10 };
+    int action = 0;
+    if (page == 0x01) switch (usage) {
+        case 0x8c: action = UP; break;    case 0x8d: action = DOWN; break;
+        case 0x8b: action = LEFT; break;  case 0x8a: action = RIGHT; break;
+        case 0x89: action = PLAY_PAUSE_SELECT; break;  case 0x86: action = MENU; break;
+    }
+    if (page == 0x0c && usage == 0xcd) action = PLAY_PAUSE;
+    if (page == 0x0c && usage == 0x223) action = TOP_MENU;  // AC Home: atvpadd sends it for PS, to leave Kodi
+    bool arrow = action >= UP && action <= RIGHT && action != PLAY_PAUSE_SELECT;
+    if (!action || (!down && !arrow)) return;
+    static mach_timebase_info_data_t tb;
+    if (!tb.denom) mach_timebase_info(&tb);
+    double now = (double)mach_absolute_time() * tb.numer / tb.denom / 1e9;  // BREvent time is seconds of mach time
+    id ev = [objc_getClass("BREvent") eventWithAction:action value:down atTime:now originator:1];
+    if (ev) [[UIApplication sharedApplication] postEvent:ev];
+}
+
 static void startInjectListener(void) {
     int fd = socket(AF_INET, SOCK_DGRAM, 0);
     struct sockaddr_in a = { .sin_family = AF_INET, .sin_port = htons(ATVREMOTE_INJECT_PORT), .sin_addr.s_addr = htonl(INADDR_LOOPBACK) };
@@ -272,6 +297,7 @@ static void startInjectListener(void) {
     dispatch_source_set_event_handler(src, ^{
         uint32_t p[3];
         while (recv(fd, p, sizeof p, 0) == sizeof p) {
+            if (processSel == @selector(_processHIDEvent:)) { postRemoteAction(p[0], p[1], p[2]); continue; }  // iOS 8
             // arrows auto-repeat until their release arrives; select/menu/play treat a release as another press
             bool arrow = p[0] == 0x01 && p[1] >= 0x8a && p[1] <= 0x8d;
             if (!p[2] && !arrow) continue;
@@ -300,8 +326,9 @@ static void holdScreenSaverWhileAppOpen(void) {
 
 __attribute__((constructor)) static void init(void) {
     sock = socket(AF_INET, SOCK_DGRAM, 0);
-    Method m = class_getInstanceMethod(objc_getClass("ATVHIDSystemClient"), @selector(processHIDEvent:));
-    if (!m) m = class_getInstanceMethod(objc_getClass("ATVHIDSystemClient"), @selector(_processHIDEvent:));  // iOS 8
+    processSel = @selector(processHIDEvent:);
+    Method m = class_getInstanceMethod(objc_getClass("ATVHIDSystemClient"), processSel);
+    if (!m) m = class_getInstanceMethod(objc_getClass("ATVHIDSystemClient"), processSel = @selector(_processHIDEvent:));  // iOS 8
     if (m) origProcess = method_setImplementation(m, (IMP)hookedProcess);
     startInjectListener();
     holdScreenSaverWhileAppOpen();

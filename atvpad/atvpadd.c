@@ -137,7 +137,13 @@ static void send_event(int player, int button, int down) {
         struct timeval now; gettimeofday(&now, NULL);
         if (down) { pressed = now; return; }
         long held_ms = (now.tv_sec - pressed.tv_sec) * 1000 + (now.tv_usec - pressed.tv_usec) / 1000;
-        if (held_ms > 1000 || !pid) return;
+        if (held_ms > 1000) return;
+        if (!pid) {  // no app of ours open: AC Home, which the tweak posts as Top Menu (leaves Kodi and other plugins)
+            uint32_t home[3] = { 0x0c, 0x223, 1 };
+            a.sin_port = htons(ATVREMOTE_INJECT_PORT);
+            sendto(udp_sock, home, sizeof home, 0, (struct sockaddr *)&a, sizeof a);
+            return;
+        }
         if (!(flags & ATVREMOTE_HANDLES_HOME)) { logf_ts("home: closed app %d\n", atvremote_close_active()); return; }
         pkt[2] = 1;  // the app handles PS itself: deliver the tap as a press + release
         sendto(udp_sock, pkt, sizeof pkt, 0, (struct sockaddr *)&a, sizeof a);

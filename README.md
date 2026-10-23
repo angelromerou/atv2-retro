@@ -64,6 +64,7 @@ Blackb0x's script (`/etc/setup.sh`) runs again at every boot and runs `apt-get u
 **Differences from the ATV2**
 - Arrange or hide any home-screen item, ours included, the stock way: hold Select until it jiggles, move it with the arrows, or press Play/Pause for **Hide This Item**. Hidden items come back under **Settings → Main Menu**.
 - Apple's screensaver photos stay.
+- On the home screen and in Kodi a controller sends exactly what the Apple remote does (AppleTV's own `BREvent`s), and PS goes back to the home screen.
 - Controllers work as on the ATV2 (tested with a DualSense). Its BCM4334 chip has Bluetooth LE, but `atvpadd` is Classic only, so Xbox pads still don't work.
 - Screenshots (`atvopen --screenshot`, `/remote`) show the home screen, but come out black while an app is open.
 - iOS 8 kills unsigned binaries: `tools/deploy.sh` and `tools/install-system.sh` sign everything with `ldid -S` on the Apple TV.
