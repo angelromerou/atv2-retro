@@ -1,8 +1,8 @@
 # atv2-retro
 
-Turns a jailbroken Apple TV 2 into a retro game console.
+Turns a jailbroken Apple TV 2 into a retro game console. The Apple TV 3 is partly supported (see [Apple TV 3](#apple-tv-3)).
 
-Target: a jailbroken Apple TV 2 (iOS 6.1.4 / ATV 5.3, Seas0nPass), reached over SSH as `root`. **Apple TV 2 only.** The Apple TV 3 has no easy jailbreak, and the Bluetooth daemon and menu tweak are written for the ATV2's chip and software.
+Target: a jailbroken Apple TV 2 (iOS 6.1.4 / ATV 5.3, Seas0nPass), reached over SSH as `root`. The rest of this README describes the ATV2.
 
 In this README, `<atv-ip>` means your Apple TV's address. Find it on the TV under **Settings → General → Network** (e.g. `192.168.1.50`). Giving the Apple TV a fixed address in your router's DHCP settings keeps the links below from changing.
 
@@ -30,7 +30,7 @@ Open `http://<atv-ip>` in a browser on any phone or computer on the same network
 - The console is picked from the file type. For an ambiguous file, pick the console on the page first.
 - Zipped ROMs are unpacked for you.
 - The page lists the games already on the Apple TV, each with a **Delete** button. Deleting keeps the game's battery save. Reopen a console on the TV to see changes.
-- From Git Bash you can also run `tools/add-roms.sh snes "Some Game (USA).sfc"` (consoles: nes snes gb gba md).
+- From Git Bash, WSL or Linux you can also run `tools/add-roms.sh snes "Some Game (USA).sfc"` (consoles: nes snes gb gba md).
 
 - ROMs live in `/var/mobile/Media/ROMs/<console>/`.
 - Tags like `(USA)` and `[!]` are hidden from game titles.
@@ -45,6 +45,32 @@ Open `http://<atv-ip>` in a browser on any phone or computer on the same network
 
 Paired pads reconnect when you press PS. Xbox Series and current Xbox One pads can't work, because the ATV2's BCM4329 radio has no Bluetooth Low Energy.
 
+## Apple TV 3
+
+Tested on an A1469 (AppleTV3,2) running iOS 8.4.4 (12H1006, the build Apple still signs). The ATV3 keeps its stock home screen: our apps are added as ordinary icons in its grid.
+
+**Jailbreak** with [Blackb0x](https://github.com/NSSpiral/Blackb0x) from a Mac (untethered on 8.4.x). The A1427 (AppleTV3,1) first needs checkm8-A5 run from an Arduino; the A1469 does not. Blackb0x's first-boot script can fail its `apt-get update` (the network isn't up yet) and then silently skips MobileSubstrate and Kodi. If `/Library/Frameworks/CydiaSubstrate.framework` is missing, run on the Apple TV:
+
+```bash
+apt-get update
+dpkg -i /var/cache/apt/archives/com.saurik.patcyh_1.2.0_iphoneos-arm-fixed.deb
+apt-get install -y mobilesubstrate com.saurik.substrate.safemode
+apt-get -y --force-yes install org.xbmc.kodi-atv2   # Kodi, optional
+reboot
+```
+
+Blackb0x's script (`/etc/setup.sh`) runs again at every boot and runs `apt-get upgrade`.
+
+**Differences from the ATV2**
+- Arrange or hide any home-screen item, ours included, the stock way: hold Select until it jiggles, move it with the arrows, or press Play/Pause for **Hide This Item**. Hidden items come back under **Settings → Main Menu**.
+- Apple's screensaver photos stay.
+- Controllers: not yet. `atvpadd` isn't ported (the ATV3's Bluetooth chip is on a plain UART, `/dev/tty.bluetooth`), so `tools/install-system.sh` leaves Apple's Bluetooth running and skips it.
+- Screenshots (`atvopen --screenshot`, `/remote`) show the home screen, but come out black while an app is open.
+- iOS 8 kills unsigned binaries: `tools/deploy.sh` and `tools/install-system.sh` sign everything with `ldid -S` on the Apple TV.
+- Apps need `UIDeviceFamily` with 3 (Apple TV) in their Info.plist, or the home screen refuses to launch them ("App looks unsafe for use on the internet"). The apps here have it, and `tools/make-menu.py` adds it.
+- Menu icons are 282x159 `@1080.png` files (the ATV2 uses 188x108 `@720.png`). `tools/make-menu.py` makes both.
+- The SSH server needs `-o HostKeyAlgorithms=+ssh-rsa` from a current `ssh` (`tools/atv-ssh.sh` sets it).
+
 ## How it works
 
 | Piece | What it does |
@@ -57,7 +83,7 @@ Paired pads reconnect when you press PS. Xbox Series and current Xbox One pads c
 
 ## Building and deploying
 
-Builds run in WSL Ubuntu and deploys run in Git Bash. Run `toolchain/setup.sh` once first.
+Builds run in WSL Ubuntu or Ubuntu/Debian Linux. Deploys run in Git Bash (with PuTTY's `plink`/`pscp`), or in WSL/Linux with `ssh`/`scp` and `sshpass`. Run `toolchain/setup.sh` once first. On Linux, drop the `wsl -d Ubuntu --` prefix below.
 
 ```bash
 wsl -d Ubuntu -- bash tools/build-cores.sh       # libretro cores -> build/cores/

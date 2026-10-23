@@ -25,6 +25,11 @@
 	<string>snes</string>
 	<key>RetroTitle</key>
 	<string>Super Nintendo</string>
+	<key>UIDeviceFamily</key>
+	<array>
+		<integer>1</integer>
+		<integer>3</integer>
+	</array>
 	<key>UIInterfaceOrientation</key>
 	<string>UIInterfaceOrientationLandscapeRight</string>
 	<key>UIStatusBarHidden</key>

@@ -1,9 +1,10 @@
 #!/bin/bash
-# One-time setup of the Apple TV 2 (armv7, iOS 6.1) cross toolchain in WSL Ubuntu.
-# Run inside WSL: bash toolchain/setup.sh   (asks for sudo once for apt packages)
+# One-time setup of the Apple TV 2 (armv7, iOS 6.1) cross toolchain in WSL Ubuntu or Ubuntu/Debian Linux.
+# Run inside WSL or Linux: bash toolchain/setup.sh   (asks for sudo once for apt packages)
 # Produces: ~/atv/toolchain (ld64/cctools), ~/atv/sdks/iPhoneOS6.1.sdk. Compile with toolchain/atv-cc.
 set -e
-sudo apt-get install -y clang lld llvm cmake autoconf automake libtool libxml2-dev libbsd-dev libblocksruntime-dev
+sudo apt-get install -y clang lld llvm cmake autoconf automake libtool libxml2-dev libbsd-dev libblocksruntime-dev \
+  sshpass python3-pil fonts-dejavu-core  # deploys from WSL/Linux (tools/atv-ssh.sh), tools/make-menu.py
 mkdir -p ~/atv && cd ~/atv
 D=$HOME/atv/deps
 

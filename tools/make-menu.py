@@ -1,7 +1,7 @@
-"""Generates the Apple TV main-menu entries (appliance plist + 188x108 icon) for our apps, and the
-Info.plist of each console app. Run on Windows (needs Pillow): python tools/make-menu.py
+"""Generates the Apple TV main-menu entries (appliance plist + icons) for our apps, and the
+Info.plist of each console app. Needs Pillow: python tools/make-menu.py
 
-Each app gets <App>.app/ATVMenu/{<key>.appliance, <key with . -> _>@720.png}, and the consoles in
+Each app gets <App>.app/ATVMenu/{<key>.appliance, <key with . -> _>@720.png (ATV2), ...@1080.png (ATV3)}, and the consoles in
 SHELF_LOGOS also a top-shelf logo (they sit in the top row; the rest go in the grid). tools/deploy.sh copies
 those into AppleTV.app, where the ATVLaunch tweak turns them into menu items (see atvlaunch/Tweak.m).
 Console apps are Retro (apps/retro) + one libretro core; tools/build-consoles.sh fills in the binaries.
@@ -140,13 +140,15 @@ def glyph(kind, W, H):
             circle(d, cx + (14 + i * 12) * S, cy + (6 - i * 5) * S, 5.5 * S)
         d.rounded_rectangle((cx - 6 * S, cy - 14 * S, cx + 6 * S, cy - 9 * S), radius=2.5 * S, fill=0)  # start
     elif kind == "doom":  # bold title text
-        font = ImageFont.truetype("C:/Windows/Fonts/arialbd.ttf", 46 * S)
+        fonts = ["C:/Windows/Fonts/arialbd.ttf", "/mnt/c/Windows/Fonts/arialbd.ttf",  # Windows, WSL
+                 "/System/Library/Fonts/Supplemental/Arial Bold.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"]
+        font = ImageFont.truetype(next(f for f in fonts if os.path.exists(f)), 46 * S)
         box = d.textbbox((0, 0), "DOOM", font=font)
         d.text((cx - (box[2] - box[0]) / 2 - box[0], cy - (box[3] - box[1]) / 2 - box[1]), "DOOM", font=font, fill=255)
     return g
 
 
-def icon(rgb, kind, path):
+def icon(rgb, kind, base):
     W, H = 188 * S, 108 * S
     inner = (3 * S, 2 * S, W - 3 * S, H - 4 * S)  # tile inside the drop shadow, like Apple's icons
     bg = Image.new("RGB", (W, H))
@@ -166,7 +168,8 @@ def icon(rgb, kind, path):
     ImageDraw.Draw(shadow).rounded_rectangle((inner[0], inner[1] + 2 * S, inner[2], inner[3] + 2 * S), radius=9 * S, fill=(0, 0, 0, 140))
     out = Image.alpha_composite(shadow.filter(ImageFilter.GaussianBlur(2 * S)), tile)
     out = Image.composite(Image.new("RGBA", (W, H), (255, 255, 255, 255)), out, glyph(kind, W, H))
-    out.resize((188, 108), Image.LANCZOS).save(path)
+    out.resize((188, 108), Image.LANCZOS).save(base + "@720.png")
+    out.resize((282, 159), Image.LANCZOS).save(base + "@1080.png")  # ATV3: 1080p menu, Apple's tile size
 
 
 def main():
@@ -194,7 +197,7 @@ def main():
             "ATVDEVLaunchID": bundle_id,
             **shelf,
         }, open(os.path.join(menu, key + ".appliance"), "wb"))
-        icon(rgb, kind, os.path.join(menu, key.replace(".", "_") + "@720.png"))
+        icon(rgb, kind, os.path.join(menu, key.replace(".", "_")))
         if console:
             plistlib.dump({
                 "CFBundleExecutable": "Retro",
@@ -204,6 +207,7 @@ def main():
                 "CFBundleVersion": "1.0",
                 "UIInterfaceOrientation": "UIInterfaceOrientationLandscapeRight",
                 "UIStatusBarHidden": True,
+                "UIDeviceFamily": [1, 3],             # 3 = Apple TV: the ATV3 (iOS 8) refuses to launch apps without it
                 "RetroCore": console["core"],         # core.dylib in the bundle is built from this core
                 "RetroSystem": console["system"],     # ROM folder under /var/mobile/Media/ROMs
                 "RetroTitle": console["title"],

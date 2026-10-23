@@ -10,6 +10,7 @@
 //    is one of its five built-in ones, so plists with FRPrincipalClass = APP_APPLIANCE_CLASS are loaded
 //    here as a runtime subclass of BRBaseAppliance and shown in the top row (ATVDEVTopRow) or the grid below it;
 //    selecting one launches the bundle id in its ATVDEVLaunchID key. (tools/deploy.sh installs an app's <App>.app/ATVMenu/ files into AppleTV.app.)
+//    On iOS 8 (ATV3) the stock home screen is kept: our items join its grid and only the loading/launching hooks apply.
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
 #include <notify.h>
@@ -29,6 +30,9 @@ enum { kIOHIDEventTypeKeyboard = 3, kKbdPage = 3 << 16, kKbdUsage = (3 << 16) | 
 - (void)postEvent:(id)brEvent;
 @end
 @interface NSObject (BR)
++ (id)defaultWorkspace;
+- (BOOL)openApplicationWithBundleID:(NSString *)ident;
+- (NSString *)principalClassName;
 + (id)eventWithPage:(unsigned short)page usage:(unsigned short)usage value:(int)value;
 + (id)infoForApplianceDescription:(NSDictionary *)description;
 - (id)initWithApplianceInfo:(id)info;
@@ -43,6 +47,12 @@ static NSMutableDictionary *launchIds;    // appliance key -> bundle id to launc
 static NSMutableSet *topRowKeys;          // appliances whose plist sets ATVDEVTopRow
 static NSMutableDictionary *shelfImages;  // appliance key -> path of its ATVDEVShelfImage (in AppleTV.app)
 static IMP origLoadAppliance, origPushController;
+
+static void launchApp(NSString *ident) {
+    UIApplication *app = [UIApplication sharedApplication];
+    if ([app respondsToSelector:@selector(activateApplicationWithIdentifier:)]) [app activateApplicationWithIdentifier:ident];
+    else [[objc_getClass("LSApplicationWorkspace") defaultWorkspace] openApplicationWithBundleID:ident];  // iOS 8 (ATV3)
+}
 
 // -[BRApplianceManager _loadApplianceAtPath:]
 static id hookedLoadAppliance(id self, SEL _cmd, NSString *path) {
@@ -60,11 +70,24 @@ static id hookedLoadAppliance(id self, SEL _cmd, NSString *path) {
     return ((id (*)(id, SEL, NSString *))origLoadAppliance)(self, _cmd, path);
 }
 
-// -[ATVMainMenuController _pushControllerForApplianceOrMerchant:]
+// iOS 8 (ATV3): -[BRApplianceManager _loadApplianceWithInfo:] gets the parsed appliance plist. The items land in the
+// stock grid, where the user arranges or hides them like Apple's; ATVDEVTopRow and ATVDEVShelfImage are not used.
+static IMP origLoadApplianceWithInfo;
+static id hookedLoadApplianceWithInfo(id self, SEL _cmd, id info) {
+    if ([[info principalClassName] isEqual:@APP_APPLIANCE_CLASS]) {
+        NSString *launchId = [[info performSelector:@selector(info)] objectForKey:@"ATVDEVLaunchID"];
+        if (!launchId) return nil;
+        [launchIds setObject:launchId forKey:[info performSelector:@selector(key)]];
+        return [[[appAppliance alloc] initWithApplianceInfo:info] autorelease];
+    }
+    return ((id (*)(id, SEL, id))origLoadApplianceWithInfo)(self, _cmd, info);
+}
+
+// -[ATVMainMenuController _pushControllerForApplianceOrMerchant:] (iOS 8: _pushControllerForAppliance:)
 static void hookedPushController(id self, SEL _cmd, id item) {
     if ([item isKindOfClass:appAppliance]) {
         NSString *launchId = [launchIds objectForKey:[[item performSelector:@selector(applianceInfo)] performSelector:@selector(key)]];
-        if (launchId) [[UIApplication sharedApplication] activateApplicationWithIdentifier:launchId];
+        if (launchId) launchApp(launchId);
         return;
     }
     ((void (*)(id, SEL, id))origPushController)(self, _cmd, item);
@@ -186,9 +209,12 @@ static void installMenuInMerchantGrid(void) {
 
 static void installAppAppliances(void) {
     Class base = objc_getClass("BRBaseAppliance");
-    Method load = class_getInstanceMethod(objc_getClass("BRApplianceManager"), @selector(_loadApplianceAtPath:));
-    Method push = class_getInstanceMethod(objc_getClass("ATVMainMenuController"), @selector(_pushControllerForApplianceOrMerchant:));
-    if (!base || !load || !push) { NSLog(@"atvlaunch: main menu classes missing, no app items"); return; }
+    Class mgr = objc_getClass("BRApplianceManager"), mm = objc_getClass("ATVMainMenuController");
+    Method load = class_getInstanceMethod(mgr, @selector(_loadApplianceAtPath:));
+    Method loadInfo = class_getInstanceMethod(mgr, @selector(_loadApplianceWithInfo:));  // iOS 8
+    Method push = class_getInstanceMethod(mm, @selector(_pushControllerForApplianceOrMerchant:));
+    if (!push) push = class_getInstanceMethod(mm, @selector(_pushControllerForAppliance:));  // iOS 8
+    if (!base || !(load || loadInfo) || !push) { NSLog(@"atvlaunch: main menu classes missing, no app items"); return; }
     launchIds = [NSMutableDictionary new];
     topRowKeys = [NSMutableSet new];
     shelfImages = [NSMutableDictionary new];
@@ -197,9 +223,10 @@ static void installAppAppliances(void) {
     objc_registerClassPair(appAppliance);
     Protocol *shelfProto = objc_getProtocol("BRTopShelfController");
     if (shelfProto) class_addProtocol([ATVDEVShelf class], shelfProto);
-    origLoadAppliance = method_setImplementation(load, (IMP)hookedLoadAppliance);
+    if (load) origLoadAppliance = method_setImplementation(load, (IMP)hookedLoadAppliance);
+    else origLoadApplianceWithInfo = method_setImplementation(loadInfo, (IMP)hookedLoadApplianceWithInfo);
     origPushController = method_setImplementation(push, (IMP)hookedPushController);
-    installMenuInMerchantGrid();
+    if (load) installMenuInMerchantGrid();  // iOS 6 (ATV2) layout only
 }
 
 UIImage *_UICreateScreenUIImage(void);
@@ -274,6 +301,7 @@ static void holdScreenSaverWhileAppOpen(void) {
 __attribute__((constructor)) static void init(void) {
     sock = socket(AF_INET, SOCK_DGRAM, 0);
     Method m = class_getInstanceMethod(objc_getClass("ATVHIDSystemClient"), @selector(processHIDEvent:));
+    if (!m) m = class_getInstanceMethod(objc_getClass("ATVHIDSystemClient"), @selector(_processHIDEvent:));  // iOS 8
     if (m) origProcess = method_setImplementation(m, (IMP)hookedProcess);
     startInjectListener();
     holdScreenSaverWhileAppOpen();
@@ -286,7 +314,7 @@ __attribute__((constructor)) static void init(void) {
         NSString *ident = [[NSString stringWithContentsOfFile:@ATVLAUNCH_FILE encoding:NSUTF8StringEncoding error:NULL]
                            stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
         NSLog(@"atvlaunch: activating %@", ident);
-        if (ident.length) [[UIApplication sharedApplication] activateApplicationWithIdentifier:ident];
+        if (ident.length) launchApp(ident);
     });
     NSLog(@"atvlaunch: loaded, hid hook %s", m ? "ok" : "MISSING");
 }
